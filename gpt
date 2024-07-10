@@ -1,0 +1,265 @@
+
+1.productController.js
+
+const productModel=require("../models/product");
+
+
+
+const addProduct= async(req,res)=>{
+    // const data=req.body;
+    // const newData=new productModel(data);
+    // if(!newData) throw new error(400,error);
+    // await newData.save();
+    // res.status(200).send({message: "Data is saved successfully"});
+    const { title, Description, price, quantity } = req.body;
+    const image = req.file ? req.file.filename : null;
+
+    if (!title || !Description || !price || !quantity || !image) {
+        return res.status(400).json({ message: "All fields are required" });
+    }
+
+    try {
+        const newData = new productModel({
+            title,
+            Description,
+            price,
+            quantity,
+            image,
+        });
+      console.log(newData)
+
+        await newData.save();
+        res.status(200).send({ message: "Data is saved successfully" });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+
+}
+//get all data
+const getAllProduct=async(req,res)=>{
+
+    const allData=await productModel.find({});
+    res.status(200).send({data:allData,message:"ok"});
+}
+
+//get product by id
+
+const getById=async(req,res)=>{
+     
+    const id=req.params.id
+    const data=await productModel.findById(id);
+    res.status(200).send({data:data,message:"ok"})
+}
+
+//Delete a product
+
+const deleteProduct=async(req,res)=>{
+    const id=req.params.id;
+    const data=await productModel.findByIdAndDelete(id);
+    res.status(200).send({message:"data is deleted successfully"});
+}
+
+//update product details
+
+const updateProduct=async(req,res)=>{
+    const id=req.params.id;
+    const newData=req.body;
+    await productModel.findByIdAndUpdate(id,newData);
+    res.status(200).send({message:"Product details updated successfully"})
+
+
+}
+
+module.exports={addProduct,getAllProduct,getById,deleteProduct,updateProduct};
+
+2.product.js
+
+const mongoose=require("mongoose");
+
+const productSchema=new mongoose.Schema({
+    serial_no:String,
+    title:String,
+    Description:String,
+    image:String,
+    price:String,
+    quantity:String
+    
+},{timestamps:true,})
+
+const productModel= mongoose.model('product',productSchema);
+module.exports=productModel;
+
+3.index.js
+
+const router=require('express').Router();
+const productRoutes=require('./productRouter');
+const userRoutes=require('./userRouter');
+
+router.use('/user',userRoutes);
+router.use('/product',productRoutes);
+
+
+
+module.exports=router;
+
+4.productRouter.js
+
+const { addProduct, getAllProduct, getById, deleteProduct, updateProduct } = require("../controller/productController");
+const asyncHandler = require("../utils/asyncHandler");
+const router=require("express").Router();
+
+const multer  = require('multer');
+
+
+
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+      cb(null, '../upload')
+    },
+    filename: function (req, file, cb) {
+      return cb(null,`${Date.now()}_${file.originalname}`)
+    }
+  })
+  const upload=multer({storage:storage})
+
+
+router.get('/',asyncHandler(getAllProduct));
+router.get('/:id',asyncHandler(getById));
+router.post("/addProduct",upload.single('image'),asyncHandler(addProduct));
+router.put('/:id',asyncHandler(updateProduct));
+router.delete('/:id',asyncHandler(deleteProduct));
+
+module.exports=router;
+
+Front end
+
+import React from "react";
+import NavBar from "../components/NavBar";
+import {
+  Box,
+  Button,
+  Container,
+  Grid,
+  Paper,
+  TextField,
+  Typography,
+} from "@mui/material";
+import MyTable from "../components/MyTable";
+import { useForm } from "react-hook-form";
+import { toast } from "react-toastify";
+import { addProduct } from "../apis";
+
+const Formpage = () => {
+  const { register, handleSubmit } = useForm();
+  const onSubmit = async (data) => {
+    console.log(data);
+    const formData = new FormData();
+    Object.keys(data).forEach((key) => {
+      formData.append(key, data[key]);
+    });
+    const fileInput = document.getElementById("image");
+    if (fileInput && fileInput.files[0]) {
+      formData.append("image", fileInput.files[0]);
+    }
+    try {
+      await addProduct(formData);
+      toast.success("success");
+    } catch (error) {
+      toast.error(error.response.data.message);
+    }
+  };
+  return (
+    <div>
+      {" "}
+      <NavBar />
+      <Container>
+        <Box sx={{ margin: 5 }}>
+          <Paper elevation={24} sx={{ width: "50%" }}>
+            <form onSubmit={handleSubmit(onSubmit)} action="">
+              <Typography align="center" variant="h3">
+                Add Product
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item sx={{ marginLeft: "40px" }} sm={12}>
+                  <Typography variant="h6">Upload image</Typography>
+                  <input type="file" name="image" id="image" />
+                </Grid>
+                <Grid item sm={12} sx={{ marginLeft: "40px" }}>
+                  <TextField
+                    id="outlined-basic"
+                    label="Title"
+                    variant="outlined"
+                    {...register("title")}
+                  />
+                </Grid>
+                <Grid item sm={12} sx={{ marginLeft: "40px" }}>
+                  <TextField
+                    id="outlined-basic"
+                    label="Description"
+                    variant="outlined"
+                    {...register("Description")}
+                  />
+                </Grid>
+                <Grid item sm={12} sx={{ marginLeft: "40px" }}>
+                  <TextField
+                    id="outlined-basic"
+                    label="Price"
+                    variant="outlined"
+                    {...register("price")}
+                  />
+                </Grid>
+                <Grid item sm={12} sx={{ marginLeft: "40px" }}>
+                  <TextField
+                    id="outlined-basic"
+                    label="Quantity"
+                    variant="outlined"
+                    {...register("quantity")}
+                  />
+                </Grid>
+              </Grid>
+              <Button
+                type="submit"
+                variant="contained"
+                sx={{ marginLeft: "40px" }}
+              >
+                submit
+              </Button>
+            </form>
+          </Paper>
+        </Box>
+      </Container>
+    </div>
+  );
+};
+
+api/index.js
+
+export default Formpage;
+
+import axios from "axios";
+
+const BASE_URL = "http://localhost:2010";
+
+export const login = async (data) => {
+  try {
+    const response = await axios.post(`${BASE_URL}/user/login`, data);
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+export const addProduct = async (data) => {
+  try {
+    const response = await axios.post(
+      `${BASE_URL}/product/addProduct`,
+      { hearders: { "Content-Type": "multipart/form-data" } },
+      data
+    );
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+
+
